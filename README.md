@@ -53,15 +53,19 @@ matches your machine and copy it anywhere on your PATH:
 
 | Your machine | Binary |
 | --- | --- |
-| Mac, Apple Silicon (M1–M4) | `bin/darwin-arm64/act3-mcp` |
-| Mac, Intel | `bin/darwin-amd64/act3-mcp` |
+| Mac, Apple Silicon (M1–M4) | `bin/Mac-Apple_Silicon/act3-mcp` |
+| Mac, Intel | `bin/Mac-Intel_CPU/act3-mcp` |
 | Linux, x86-64 | `bin/linux-amd64/act3-mcp` |
 | Linux, ARM | `bin/linux-arm64/act3-mcp` |
 | Windows, x86-64 | `bin/windows-amd64/act3-mcp.exe` |
 | Windows, ARM | `bin/windows-arm64/act3-mcp.exe` |
 
-Not sure which? On macOS or Linux run `uname -sm`. On Windows, check
-`$env:PROCESSOR_ARCHITECTURE`.
+Not sure which Mac you have? Click the Apple menu → About This Mac. If it lists a
+**chip** (M1, M2, M3, M4), it is Apple Silicon; if it lists a **processor**
+(Intel Core), it is Intel. Every Mac sold since late 2020 is Apple Silicon.
+
+On Linux, run `uname -m` — `x86_64` is the x86-64 build, `aarch64` is the ARM
+one. On Windows, check `$env:PROCESSOR_ARCHITECTURE`.
 
 The Linux builds are statically linked, so they run on any distribution without
 worrying about glibc versions.

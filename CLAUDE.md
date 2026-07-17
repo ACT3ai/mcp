@@ -16,8 +16,8 @@ published.
 ## Layout
 
 ```
-bin/darwin-arm64/act3-mcp        Mac, Apple Silicon
-bin/darwin-amd64/act3-mcp        Mac, Intel
+bin/Mac-Apple_Silicon/act3-mcp   Mac, Apple Silicon (M1–M4)
+bin/Mac-Intel_CPU/act3-mcp       Mac, Intel
 bin/linux-amd64/act3-mcp         Linux, x86-64
 bin/linux-arm64/act3-mcp         Linux, ARM
 bin/windows-amd64/act3-mcp.exe   Windows, x86-64

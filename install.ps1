@@ -1,8 +1,9 @@
 # ACT3 MCP server — installer for Windows.
 #
-# This repo ships one prebuilt binary per platform, under bin\<os>-<arch>\.
-# This script picks the one matching your machine and puts it on your PATH.
-# There is nothing to compile and no toolchain to install.
+# This repo ships one prebuilt binary per platform, under bin\<platform>\ — the
+# Windows pair (windows-amd64, windows-arm64) plus the Mac and Linux builds this
+# script never selects. It picks the one matching your machine and puts it on
+# your PATH. There is nothing to compile and no toolchain to install.
 #
 #   .\install.ps1                             install to the default location
 #   .\install.ps1 -InstallDir C:\tools\bin    install somewhere specific

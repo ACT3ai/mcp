@@ -1,8 +1,9 @@
 #!/bin/sh
 # ACT3 MCP server — installer for macOS and Linux.
 #
-# This repo ships one prebuilt binary per platform, under bin/<os>-<arch>/.
-# This script picks the one matching your machine and puts it on your PATH.
+# This repo ships one prebuilt binary per platform, under bin/<platform>/ —
+# Mac-Apple_Silicon, Mac-Intel_CPU, linux-amd64, linux-arm64, and the Windows
+# pair. This script picks the one matching your machine and puts it on your PATH.
 # There is nothing to compile and no toolchain to install.
 #
 #   ./install.sh                          install to the default location
@@ -21,13 +22,18 @@ die() {
 }
 
 # ---- Which platform is this? ------------------------------------------------
-# uname's spelling is not Go's spelling, so map both axes explicitly rather than
+# uname's spelling is not the directory's spelling, so map explicitly rather than
 # guessing. An unrecognized machine gets a clear error, never a wrong binary.
+#
+# The Mac directories are named for the machine you own — Mac-Apple_Silicon and
+# Mac-Intel_CPU — not for the kernel (`darwin`) or a CPU vendor Apple has never
+# shipped (`amd64`). uname still answers in its own vocabulary, so this is where
+# the two are reconciled: one place, explicit, and wrong only loudly.
 os=$(uname -s)
 arch=$(uname -m)
 
 case "$os" in
-    Darwin) os="darwin" ;;
+    Darwin) os="mac" ;;
     Linux)  os="linux"  ;;
     MINGW*|MSYS*|CYGWIN*)
         die "this is Windows — run install.ps1 in PowerShell instead" ;;
@@ -40,8 +46,16 @@ case "$arch" in
     *) die "unsupported CPU architecture: $arch (supported: x86_64, arm64)" ;;
 esac
 
-src="$repo_dir/bin/$os-$arch/$BINARY"
-[ -f "$src" ] || die "no binary for $os-$arch at: $src
+case "$os-$arch" in
+    mac-arm64)   platform="Mac-Apple_Silicon" ;;
+    mac-amd64)   platform="Mac-Intel_CPU" ;;
+    linux-amd64) platform="linux-amd64" ;;
+    linux-arm64) platform="linux-arm64" ;;
+    *) die "unsupported machine: $os-$arch" ;;
+esac
+
+src="$repo_dir/bin/$platform/$BINARY"
+[ -f "$src" ] || die "no binary for $platform at: $src
        This clone looks incomplete. Try: git pull"
 
 # ---- Where should it go? ----------------------------------------------------
@@ -76,7 +90,7 @@ trap - EXIT INT TERM
 # blocked. Execute it once and fail loudly rather than declare false success.
 version=$("$dest" --version 2>/dev/null) || die "installed to $dest, but it will not run.
        This usually means the binary does not match your machine.
-       Detected: $os-$arch"
+       Detected: $platform"
 
 echo "✓ installed $BINARY v$version -> $dest"
 
