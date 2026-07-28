@@ -87,23 +87,27 @@ per-user one.
 ## Log in
 
 ```bash
-act3-mcp login
+act3-mcp login --mode production
 ```
 
-This opens the ACT3 dashboard where you generate an API key, then prompts you to
-paste it. The key is verified and stored at `~/.act3/credentials.json` (file
-mode `0600`). Check it any time with:
+This opens your browser to `app.act3ai.com` and asks you to approve this computer
+(no password on that screen). The credential is stored at `~/.act3/credentials.json`
+(file mode `0600`). Check it any time with:
 
 ```bash
-act3-mcp status
+act3-mcp status --mode production
 ```
+
+> `--mode production` targets `api.act3ai.com`. To avoid repeating the flag, set it
+> once with `export ACT3_MODE=production`. Without production (flag or env), the
+> commands use the local dev backend instead.
 
 ## Connect it to Claude Code
 
 Add the server (once):
 
 ```bash
-claude mcp add act3 -- act3-mcp serve
+claude mcp add act3 -e ACT3_MODE=production -- act3-mcp serve
 ```
 
 Or add it by hand to `.mcp.json` / your Claude Code config:
@@ -113,7 +117,8 @@ Or add it by hand to `.mcp.json` / your Claude Code config:
   "mcpServers": {
     "act3": {
       "command": "act3-mcp",
-      "args": ["serve"]
+      "args": ["serve"],
+      "env": { "ACT3_MODE": "production" }
     }
   }
 }

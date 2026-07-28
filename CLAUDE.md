@@ -58,9 +58,10 @@ Claude Code ──stdio (JSON-RPC)──▶ act3-mcp ──HTTPS──▶ ACT3 b
 
 ## Authentication
 
-`act3-mcp login` opens the ACT3 dashboard API-keys page; the user pastes a key,
-it is verified against the backend, then stored at `~/.act3/credentials.json`
-with file mode `0600`.
+`act3-mcp login` opens the ACT3 dashboard in your browser and asks you to approve
+this computer (OAuth2 + PKCE, no password on that screen); the returned token is
+stored at `~/.act3/credentials.json` with file mode `0600`. `act3-mcp login
+--api-key` skips the browser and takes a pasted API key instead.
 
 Resolution order: the `ACT3_API_KEY` environment variable, then stored
 credentials. The env var wins, which is what lets CI run without a login.

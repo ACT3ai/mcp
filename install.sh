@@ -110,19 +110,22 @@ esac
 
 cat <<EOF
 
-Next steps:
+Next steps (production):
 
-  1. Log in to ACT3 (opens the dashboard, then paste your API key):
+  1. Sign in to ACT3 (opens your browser to approve this computer):
 
-       $BINARY login
+       $BINARY login --mode production
 
   2. Connect it to Claude Code:
 
-       claude mcp add act3 -- $BINARY serve
+       claude mcp add act3 -e ACT3_MODE=production -- $BINARY serve
 
   3. Confirm it works:
 
-       $BINARY status
+       $BINARY status --mode production
+
+  Tip: run 'export ACT3_MODE=production' once, then you can drop the flags above.
+       Omit the flag (or ACT3_MODE) to use the local dev backend instead.
 
 Then just ask Claude Code for the filmmaking change you want.
 EOF
