@@ -118,7 +118,7 @@ Next steps (production):
 
   2. Connect it to Claude Code:
 
-       claude mcp add act3 -e ACT3_MODE=production -- $BINARY serve
+       claude mcp add act3 -s user -e ACT3_MODE=production -- $BINARY serve
 
   3. Confirm it works:
 

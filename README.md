@@ -31,7 +31,7 @@ Clone this repo and run the installer for your platform.
 ```bash
 git clone https://github.com/ACT3ai/mcp.git
 cd mcp
-./install.sh
+./installV2.sh
 ```
 
 **Windows** (PowerShell)
@@ -39,11 +39,16 @@ cd mcp
 ```powershell
 git clone https://github.com/ACT3ai/mcp.git
 cd mcp
-.\install.ps1
+.\installV2.ps1
 ```
 
 The installer detects your operating system and CPU, copies the matching binary
-onto your PATH, and runs it once to confirm it works.
+onto your PATH, and runs it once to confirm it works. It then signs you in to
+ACT3 (opens your browser, skipped if already signed in), registers the server
+with Claude Code for all your projects, and runs a final status check.
+
+Prefer to do those steps yourself? `install.sh` / `install.ps1` copy the binary
+only and print the manual steps.
 
 <details>
 <summary>Installing by hand instead</summary>
@@ -104,11 +109,14 @@ act3-mcp status --mode production
 
 ## Connect it to Claude Code
 
-Add the server (once):
+Add the server (once, for all your projects):
 
 ```bash
-claude mcp add act3 -e ACT3_MODE=production -- act3-mcp serve
+claude mcp add act3 -s user -e ACT3_MODE=production -- act3-mcp serve
 ```
+
+> Without `-s user` the server is registered for the current directory only and
+> will not appear in `/mcp` anywhere else.
 
 Or add it by hand to `.mcp.json` / your Claude Code config:
 
@@ -165,8 +173,11 @@ All optional — defaults work for production.
 ## Updating
 
 ```bash
-git pull && ./install.sh
+git pull && ./installV2.sh
 ```
+
+(Windows: `git pull; .\installV2.ps1`. Re-running is safe — it skips the login
+and Claude Code steps when they are already done.)
 
 ## Troubleshooting
 

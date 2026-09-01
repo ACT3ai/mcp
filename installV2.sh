@@ -16,7 +16,7 @@
 #   ACT3_SKIP_LOGIN=1 ./installV2.sh        install only; do not open a browser
 #   ACT3_SKIP_CLAUDE=1 ./installV2.sh       do not touch Claude Code config
 #
-# Windows: run install.ps1 in PowerShell instead.
+# Windows: run installV2.ps1 in PowerShell instead.
 
 set -eu
 
@@ -41,7 +41,7 @@ case "$os" in
     Darwin) os="mac" ;;
     Linux)  os="linux"  ;;
     MINGW*|MSYS*|CYGWIN*)
-        die "this is Windows — run install.ps1 in PowerShell instead" ;;
+        die "this is Windows — run installV2.ps1 in PowerShell instead" ;;
     *)  die "unsupported operating system: $os (supported: macOS, Linux)" ;;
 esac
 
@@ -129,15 +129,18 @@ if [ "${ACT3_SKIP_CLAUDE:-}" = "1" ]; then
     echo "skipped (ACT3_SKIP_CLAUDE=1)."
 elif ! command -v claude >/dev/null 2>&1; then
     echo "Claude Code CLI ('claude') not found — skipping. When you have it, run:"
-    echo "    claude mcp add act3 -e ACT3_MODE=$MODE -- $BINARY serve"
+    echo "    claude mcp add act3 -s user -e ACT3_MODE=$MODE -- $dest serve"
 elif claude mcp get act3 >/dev/null 2>&1; then
     echo "✓ 'act3' is already registered with Claude Code — leaving it as is."
-    echo "  (To re-register: claude mcp remove act3 -s local, then re-run this script.)"
+    echo "  (To re-register: claude mcp remove act3, then re-run this script.)"
 else
-    claude mcp add act3 -e "ACT3_MODE=$MODE" -- "$BINARY" serve \
-        && echo "✓ registered 'act3' with Claude Code" \
+    # -s user: register for the whole account, not just the directory this
+    # script happens to run from. Absolute path: works even when dest_dir is
+    # not on the PATH Claude Code launches servers with.
+    claude mcp add act3 -s user -e "ACT3_MODE=$MODE" -- "$dest" serve \
+        && echo "✓ registered 'act3' with Claude Code (all projects)" \
         || echo "could not register with Claude Code — run by hand:
-    claude mcp add act3 -e ACT3_MODE=$MODE -- $BINARY serve"
+    claude mcp add act3 -s user -e ACT3_MODE=$MODE -- $dest serve"
 fi
 
 # ---- Prove the whole chain works -------------------------------------------

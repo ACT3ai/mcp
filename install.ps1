@@ -80,7 +80,7 @@ Next steps (production):
 
   2. Connect it to Claude Code:
 
-       claude mcp add act3 -e ACT3_MODE=production -- act3-mcp serve
+       claude mcp add act3 -s user -e ACT3_MODE=production -- act3-mcp serve
 
   3. Confirm it works:
 
