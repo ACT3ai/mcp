@@ -165,12 +165,81 @@ Same block, added to `claude_desktop_config.json`:
 
 All optional — defaults work for production.
 
-| Variable          | Default                   | Purpose                                     |
-| ----------------- | ------------------------- | ------------------------------------------- |
-| `ACT3_API_URL`    | `https://api.act3ai.com`  | Backend base URL                            |
-| `ACT3_API_KEY`    | —                         | API key override (skips stored creds; good for CI) |
-| `ACT3_CONFIG_DIR` | `~/.act3`                 | Where credentials are stored                |
-| `ACT3_LOG_LEVEL`  | `info`                    | `error` \| `warn` \| `info` \| `debug` (logs to stderr) |
+| Variable          | Default                     | Purpose                                     |
+| ----------------- | --------------------------- | ------------------------------------------- |
+| `ACT3_MODE`       | `production`                | Which ACT3 to talk to. This build has one mode, `production` |
+| `ACT3_API_URL`    | `https://api.act3ai.com`    | Backend base URL                            |
+| `ACT3_APP_URL`    | derived from `ACT3_API_URL` | Dashboard base URL, where the login screen lives |
+| `ACT3_API_KEY`    | —                           | API key override (skips stored creds; good for CI) |
+| `ACT3_CONFIG_DIR` | `~/.act3`                   | Where credentials are stored                |
+| `ACT3_LOG_LEVEL`  | `info`                      | `error` \| `warn` \| `info` \| `debug` (logs to stderr) |
+
+Every variable except `ACT3_API_KEY` also has a flag form — `--mode`,
+`--api-url`, `--app-url`, `--config-dir`, `--log-level` — given **after** the
+subcommand (`act3-mcp status --api-url …`). A flag beats the environment
+variable.
+
+URLs must be `https://`. The one exception is `http://` to this machine
+(`localhost`, `127.0.0.1`, `::1`); anything else is refused at startup so a
+credential is never sent in cleartext.
+
+The server does not read a `.env` file. Export the variables in your shell, or
+hand them to Claude Code with `-e` (see below) so they are set when it launches
+the server. [.env.example](./.env.example) lists them all with comments.
+
+### Using a local backend
+
+`ACT3_MODE` accepts one value, `production`, and it is the default. You point
+the server at a different ACT3 — say a backend running on this machine — with
+the URL variables, not with a mode.
+
+Set the URLs, log in against that backend, then register a second server entry
+that carries the same variables. Give it its own `ACT3_CONFIG_DIR`: a credential
+is bound to the backend that issued it, so a local login would otherwise
+overwrite your production credential (and vice versa).
+
+```bash
+export ACT3_API_URL=http://localhost:8080    # the backend API
+export ACT3_APP_URL=http://localhost:8081    # its dashboard, when on a different host or port
+export ACT3_CONFIG_DIR=~/.act3-local         # keep this login apart from production
+
+act3-mcp login       # browser opens at ACT3_APP_URL; or: act3-mcp login --api-key
+act3-mcp status      # the Backend / App lines confirm where you are
+```
+
+`act3-mcp login` registers the server with Claude Code for **production** only
+(and leaves an existing registration alone), so register the local one by hand,
+under its own name, with the variables attached. Both entries can coexist:
+
+```bash
+claude mcp add act3-local -s user \
+  -e ACT3_API_URL=http://localhost:8080 \
+  -e ACT3_APP_URL=http://localhost:8081 \
+  -e ACT3_CONFIG_DIR=~/.act3-local \
+  -- act3-mcp serve
+```
+
+Or in `.mcp.json` / `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "act3-local": {
+      "command": "act3-mcp",
+      "args": ["serve"],
+      "env": {
+        "ACT3_API_URL": "http://localhost:8080",
+        "ACT3_APP_URL": "http://localhost:8081",
+        "ACT3_CONFIG_DIR": "~/.act3-local"
+      }
+    }
+  }
+}
+```
+
+When only `ACT3_API_URL` is set, the dashboard URL is derived from it
+(`api.` becomes `app.`; a `localhost` URL is used as-is). Set `ACT3_APP_URL`
+whenever the login screen lives somewhere else.
 
 ## Updating
 
@@ -190,6 +259,15 @@ and Claude Code steps when they are already done.)
 - **`ACT3 rejected the credentials (401/403)`** — your key was revoked or is for
   a different environment. Run `act3-mcp login` again.
 - **`Cannot reach ACT3 backend`** — check `ACT3_API_URL` and your network.
+- **`refusing to use http://… — ACT3 credentials must not be sent in cleartext`**
+  — the URL is plain `http://` to a host that is not this machine. Use
+  `https://`, or `localhost` / `127.0.0.1` for a backend running locally.
+- **`saved for …, but you are in production mode (…)`** — the stored credential
+  was issued by a different backend than the one you are pointing at. Run
+  `act3-mcp login` again with the same variables set, or keep the two apart
+  with `ACT3_CONFIG_DIR` (see [Using a local backend](#using-a-local-backend)).
+- **`Unknown ACT3_MODE`** — this build has one mode, `production`. Unset
+  `ACT3_MODE`, and use `ACT3_API_URL` to point at a different backend.
 - **Claude Code shows no tools** — run `act3-mcp status`; it prints the number
   of tools the backend exposes.
 - **macOS: *"cannot be opened because the developer cannot be verified"*** —
