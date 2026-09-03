@@ -1,24 +1,24 @@
-# ACT3 MCP server — installer + first-run setup for Windows (v2).
+# ACT3 MCP server — installer + first-run setup for Windows.
 #
-# Does everything install.ps1 does (pick the prebuilt binary for this machine
-# and put it on your PATH), then walks the first-run steps for you:
+# Picks the prebuilt binary for this machine, puts it on your PATH, then walks
+# the first-run steps for you:
 #
-#   1. Checks whether this machine is already signed in to ACT3 (production).
-#      If not, runs `act3-mcp login --mode production`, which opens your browser
-#      so you can approve this computer. Already signed in? Nothing to do.
+#   1. Checks whether this machine is already signed in to ACT3. If not, runs
+#      `act3-mcp login`, which opens your browser so you can approve this
+#      computer. Already signed in? Nothing to do.
 #   2. Registers the server with Claude Code (if `claude` is installed and it is
 #      not registered yet).
-#   3. Runs `act3-mcp status --mode production` to prove the whole chain works.
+#   3. Runs `act3-mcp status` to prove the whole chain works.
 #
-#   .\installV2.ps1                             install to the default location
-#   .\installV2.ps1 -InstallDir C:\tools\bin    install somewhere specific
-#   .\installV2.ps1 -SkipLogin                  install only; do not open a browser
-#   .\installV2.ps1 -SkipClaude                 do not touch Claude Code config
+#   .\install.ps1                             install to the default location
+#   .\install.ps1 -InstallDir C:\tools\bin    install somewhere specific
+#   .\install.ps1 -SkipLogin                  install only; do not open a browser
+#   .\install.ps1 -SkipClaude                 do not touch Claude Code config
 #
 # If PowerShell blocks the script, allow it for this session only:
 #   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 #
-# macOS/Linux: run installV2.sh instead.
+# macOS/Linux: run install.sh instead.
 
 param(
     [string]$InstallDir = "$env:LOCALAPPDATA\Programs\act3-mcp",
@@ -28,7 +28,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $binary  = "act3-mcp.exe"
-$mode    = "production"
 $repoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Step($msg) {
@@ -91,20 +90,20 @@ if ($env:Path -notlike "*$InstallDir*") {
 # ---- Already signed in? -----------------------------------------------------
 # `act3-mcp status` exits 0 when credentials exist and work, 1 otherwise. It
 # never prints the token. We only trigger a browser login when it says no.
-Step "Checking ACT3 sign-in ($mode)"
+Step "Checking ACT3 sign-in"
 if ($SkipLogin) {
-    Write-Host "skipped (-SkipLogin) — run 'act3-mcp login --mode $mode' later."
+    Write-Host "skipped (-SkipLogin) — run 'act3-mcp login' later."
 } else {
     # act3-mcp logs to stderr even on success; under ErrorActionPreference=Stop,
     # PowerShell 5.1 turns redirected stderr into a terminating error. Relax it
     # for the silent probes only.
     $prevEAP = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
-    & $dest status --mode $mode *> $null
+    & $dest status *> $null
     $signedIn = ($LASTEXITCODE -eq 0)
     $account = ""
     if ($signedIn) {
-        $authLine = & $dest status --mode $mode 2>$null | Select-String '^Auth:\s*(\S+)'
+        $authLine = & $dest status 2>$null | Select-String '^Auth:\s*(\S+)'
         if ($authLine) { $account = " as $($authLine.Matches[0].Groups[1].Value)" }
     }
     $ErrorActionPreference = $prevEAP
@@ -114,9 +113,9 @@ if ($SkipLogin) {
         Write-Host "Not signed in. Opening your browser to approve this computer..."
         Write-Host "(You must already be signed in to ACT3 in that browser.)"
         Write-Host ""
-        & $dest login --mode $mode
+        & $dest login
         if ($LASTEXITCODE -ne 0) {
-            throw "Login did not complete.`n       Run it again any time:  act3-mcp login --mode $mode`n       No browser on this machine?  act3-mcp login --mode $mode --api-key"
+            throw "Login did not complete.`n       Run it again any time:  act3-mcp login`n       No browser on this machine?  act3-mcp login --api-key"
         }
     }
 }
@@ -127,7 +126,7 @@ if ($SkipClaude) {
     Write-Host "skipped (-SkipClaude)."
 } elseif (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
     Write-Host "Claude Code CLI ('claude') not found — skipping. When you have it, run:"
-    Write-Host "    claude mcp add act3 -s user -e ACT3_MODE=$mode -- `"$dest`" serve"
+    Write-Host "    claude mcp add act3 -s user -- `"$dest`" serve"
 } else {
     $prevEAP = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
@@ -141,12 +140,12 @@ if ($SkipClaude) {
         # -s user: register for the whole account, not just the directory this
         # script happens to run from. Absolute path: works even when InstallDir
         # is not on the PATH Claude Code launches servers with.
-        claude mcp add act3 -s user -e "ACT3_MODE=$mode" -- $dest serve
+        claude mcp add act3 -s user -- $dest serve
         if ($LASTEXITCODE -eq 0) {
             Write-Host "OK registered 'act3' with Claude Code (all projects)" -ForegroundColor Green
         } else {
             Write-Host "could not register with Claude Code — run by hand:"
-            Write-Host "    claude mcp add act3 -s user -e ACT3_MODE=$mode -- `"$dest`" serve"
+            Write-Host "    claude mcp add act3 -s user -- `"$dest`" serve"
         }
     }
 }
@@ -156,7 +155,7 @@ Step "Final check"
 if ($SkipLogin) {
     Write-Host "(skipped — not signed in yet)"
 } else {
-    & $dest status --mode $mode
+    & $dest status
     if ($LASTEXITCODE -ne 0) {
         throw "Status check failed — see the message above."
     }
@@ -167,7 +166,4 @@ Write-Host @"
 
 Done. In Claude Code, run /mcp to confirm 'act3' is connected, then ask for the
 filmmaking change you want.
-
-Tip: this build needs '--mode $mode' (or ACT3_MODE=$mode) for login/status.
-     Set it once:  [Environment]::SetEnvironmentVariable('ACT3_MODE', '$mode', 'User')
 "@

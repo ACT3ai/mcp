@@ -1,27 +1,26 @@
 #!/bin/sh
-# ACT3 MCP server — installer + first-run setup for macOS and Linux (v2).
+# ACT3 MCP server — installer + first-run setup for macOS and Linux.
 #
-# Does everything install.sh does (pick the prebuilt binary for this machine and
-# put it on your PATH), then walks the first-run steps for you:
+# Picks the prebuilt binary for this machine, puts it on your PATH, then walks
+# the first-run steps for you:
 #
-#   1. Checks whether this machine is already signed in to ACT3 (production).
-#      If not, runs `act3-mcp login --mode production`, which opens your browser
-#      so you can approve this computer. Already signed in? Nothing to do.
+#   1. Checks whether this machine is already signed in to ACT3. If not, runs
+#      `act3-mcp login`, which opens your browser so you can approve this
+#      computer. Already signed in? Nothing to do.
 #   2. Registers the server with Claude Code (if `claude` is installed and it is
 #      not registered yet).
-#   3. Runs `act3-mcp status --mode production` to prove the whole chain works.
+#   3. Runs `act3-mcp status` to prove the whole chain works.
 #
-#   ./installV2.sh                          install to the default location
-#   ACT3_INSTALL_DIR=~/bin ./installV2.sh   install somewhere specific
-#   ACT3_SKIP_LOGIN=1 ./installV2.sh        install only; do not open a browser
-#   ACT3_SKIP_CLAUDE=1 ./installV2.sh       do not touch Claude Code config
+#   ./install.sh                          install to the default location
+#   ACT3_INSTALL_DIR=~/bin ./install.sh   install somewhere specific
+#   ACT3_SKIP_LOGIN=1 ./install.sh        install only; do not open a browser
+#   ACT3_SKIP_CLAUDE=1 ./install.sh       do not touch Claude Code config
 #
-# Windows: run installV2.ps1 in PowerShell instead.
+# Windows: run install.ps1 in PowerShell instead.
 
 set -eu
 
 BINARY="act3-mcp"
-MODE="production"
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 die() {
@@ -41,7 +40,7 @@ case "$os" in
     Darwin) os="mac" ;;
     Linux)  os="linux"  ;;
     MINGW*|MSYS*|CYGWIN*)
-        die "this is Windows — run installV2.ps1 in PowerShell instead" ;;
+        die "this is Windows — run install.ps1 in PowerShell instead" ;;
     *)  die "unsupported operating system: $os (supported: macOS, Linux)" ;;
 esac
 
@@ -74,7 +73,7 @@ fi
 
 mkdir -p "$dest_dir" || die "cannot create $dest_dir"
 [ -w "$dest_dir" ] || die "cannot write to $dest_dir
-       Choose another: ACT3_INSTALL_DIR=\$HOME/bin ./installV2.sh"
+       Choose another: ACT3_INSTALL_DIR=\$HOME/bin ./install.sh"
 
 dest="$dest_dir/$BINARY"
 
@@ -108,19 +107,19 @@ esac
 # ---- Already signed in? -----------------------------------------------------
 # `act3-mcp status` exits 0 when credentials exist and work, 1 otherwise. It
 # never prints the token. We only trigger a browser login when it says no.
-step "Checking ACT3 sign-in ($MODE)"
+step "Checking ACT3 sign-in"
 if [ "${ACT3_SKIP_LOGIN:-}" = "1" ]; then
-    echo "skipped (ACT3_SKIP_LOGIN=1) — run '$BINARY login --mode $MODE' later."
-elif "$dest" status --mode "$MODE" >/dev/null 2>&1; then
-    account=$("$dest" status --mode "$MODE" 2>/dev/null | sed -n 's/^Auth:[[:space:]]*\([^ ]*\).*/\1/p')
+    echo "skipped (ACT3_SKIP_LOGIN=1) — run '$BINARY login' later."
+elif "$dest" status >/dev/null 2>&1; then
+    account=$("$dest" status 2>/dev/null | sed -n 's/^Auth:[[:space:]]*\([^ ]*\).*/\1/p')
     echo "✓ already signed in${account:+ as $account} — no login needed."
 else
     echo "Not signed in. Opening your browser to approve this computer…"
     echo "(You must already be signed in to ACT3 in that browser.)"
     echo
-    "$dest" login --mode "$MODE" || die "login did not complete.
-       Run it again any time:  $BINARY login --mode $MODE
-       No browser on this machine?  $BINARY login --mode $MODE --api-key"
+    "$dest" login || die "login did not complete.
+       Run it again any time:  $BINARY login
+       No browser on this machine?  $BINARY login --api-key"
 fi
 
 # ---- Register with Claude Code ---------------------------------------------
@@ -129,7 +128,7 @@ if [ "${ACT3_SKIP_CLAUDE:-}" = "1" ]; then
     echo "skipped (ACT3_SKIP_CLAUDE=1)."
 elif ! command -v claude >/dev/null 2>&1; then
     echo "Claude Code CLI ('claude') not found — skipping. When you have it, run:"
-    echo "    claude mcp add act3 -s user -e ACT3_MODE=$MODE -- $dest serve"
+    echo "    claude mcp add act3 -s user -- $dest serve"
 elif claude mcp get act3 >/dev/null 2>&1; then
     echo "✓ 'act3' is already registered with Claude Code — leaving it as is."
     echo "  (To re-register: claude mcp remove act3, then re-run this script.)"
@@ -137,10 +136,10 @@ else
     # -s user: register for the whole account, not just the directory this
     # script happens to run from. Absolute path: works even when dest_dir is
     # not on the PATH Claude Code launches servers with.
-    claude mcp add act3 -s user -e "ACT3_MODE=$MODE" -- "$dest" serve \
+    claude mcp add act3 -s user -- "$dest" serve \
         && echo "✓ registered 'act3' with Claude Code (all projects)" \
         || echo "could not register with Claude Code — run by hand:
-    claude mcp add act3 -s user -e ACT3_MODE=$MODE -- $dest serve"
+    claude mcp add act3 -s user -- $dest serve"
 fi
 
 # ---- Prove the whole chain works -------------------------------------------
@@ -148,7 +147,7 @@ step "Final check"
 if [ "${ACT3_SKIP_LOGIN:-}" = "1" ]; then
     echo "(skipped — not signed in yet)"
 else
-    "$dest" status --mode "$MODE" || die "status check failed — see the message above."
+    "$dest" status || die "status check failed — see the message above."
 fi
 
 # ---- Wrap up ----------------------------------------------------------------
@@ -160,7 +159,4 @@ fi
 cat <<MSG
 Done. In Claude Code, run /mcp to confirm 'act3' is connected, then ask for the
 filmmaking change you want.
-
-Tip: this build needs '--mode $MODE' (or ACT3_MODE=$MODE) for login/status.
-     Set it once:  echo 'export ACT3_MODE=$MODE' >> ~/.zshrc
 MSG

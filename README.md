@@ -31,7 +31,7 @@ Clone this repo and run the installer for your platform.
 ```bash
 git clone https://github.com/ACT3ai/mcp.git
 cd mcp
-./installV2.sh
+./install.sh
 ```
 
 **Windows** (PowerShell)
@@ -39,7 +39,7 @@ cd mcp
 ```powershell
 git clone https://github.com/ACT3ai/mcp.git
 cd mcp
-.\installV2.ps1
+.\install.ps1
 ```
 
 The installer detects your operating system and CPU, copies the matching binary
@@ -47,8 +47,9 @@ onto your PATH, and runs it once to confirm it works. It then signs you in to
 ACT3 (opens your browser, skipped if already signed in), registers the server
 with Claude Code for all your projects, and runs a final status check.
 
-Prefer to do those steps yourself? `install.sh` / `install.ps1` copy the binary
-only and print the manual steps.
+Prefer to do those steps yourself? `ACT3_SKIP_LOGIN=1 ACT3_SKIP_CLAUDE=1
+./install.sh` (Windows: `.\install.ps1 -SkipLogin -SkipClaude`) copies the
+binary only.
 
 <details>
 <summary>Installing by hand instead</summary>
@@ -92,27 +93,29 @@ per-user one.
 ## Log in
 
 ```bash
-act3-mcp login --mode production
+act3-mcp login
 ```
 
 This opens your browser to `app.act3ai.com` and asks you to approve this computer
 (no password on that screen). The credential is stored at `~/.act3/credentials.json`
-(file mode `0600`). Check it any time with:
+(file mode `0600`) — and when the Claude Code CLI (`claude`) is installed, login
+finishes the job by **registering the server with Claude Code automatically**,
+for all your projects. Run `/mcp` in Claude Code and `act3` is there.
+
+Check the connection any time with:
 
 ```bash
-act3-mcp status --mode production
+act3-mcp status
 ```
-
-> `--mode production` targets `api.act3ai.com`. To avoid repeating the flag, set it
-> once with `export ACT3_MODE=production`. Without production (flag or env), the
-> commands use the local dev backend instead.
 
 ## Connect it to Claude Code
 
-Add the server (once, for all your projects):
+Normally nothing to do — `act3-mcp login` registers the server for you (and
+leaves an existing registration untouched). To do it by hand, or on a machine
+where you skipped that:
 
 ```bash
-claude mcp add act3 -s user -e ACT3_MODE=production -- act3-mcp serve
+claude mcp add act3 -s user -- act3-mcp serve
 ```
 
 > Without `-s user` the server is registered for the current directory only and
@@ -125,8 +128,7 @@ Or add it by hand to `.mcp.json` / your Claude Code config:
   "mcpServers": {
     "act3": {
       "command": "act3-mcp",
-      "args": ["serve"],
-      "env": { "ACT3_MODE": "production" }
+      "args": ["serve"]
     }
   }
 }
@@ -173,10 +175,10 @@ All optional — defaults work for production.
 ## Updating
 
 ```bash
-git pull && ./installV2.sh
+git pull && ./install.sh
 ```
 
-(Windows: `git pull; .\installV2.ps1`. Re-running is safe — it skips the login
+(Windows: `git pull; .\install.ps1`. Re-running is safe — it skips the login
 and Claude Code steps when they are already done.)
 
 ## Troubleshooting
