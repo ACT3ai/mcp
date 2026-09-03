@@ -1,34 +1,39 @@
 #!/bin/sh
-# ACT3 MCP server — installer for macOS and Linux.
+# ACT3 MCP server — installer + first-run setup for macOS and Linux (v2).
 #
-# This repo ships one prebuilt binary per platform, under bin/<platform>/ —
-# Mac-Apple_Silicon, Mac-Intel_CPU, linux-amd64, linux-arm64, and the Windows
-# pair. This script picks the one matching your machine and puts it on your PATH.
-# There is nothing to compile and no toolchain to install.
+# Does everything install.sh does (pick the prebuilt binary for this machine and
+# put it on your PATH), then walks the first-run steps for you:
 #
-#   ./install.sh                          install to the default location
-#   ACT3_INSTALL_DIR=~/bin ./install.sh   install somewhere specific
+#   1. Checks whether this machine is already signed in to ACT3 (production).
+#      If not, runs `act3-mcp login --mode production`, which opens your browser
+#      so you can approve this computer. Already signed in? Nothing to do.
+#   2. Registers the server with Claude Code (if `claude` is installed and it is
+#      not registered yet).
+#   3. Runs `act3-mcp status --mode production` to prove the whole chain works.
 #
-# Windows: run install.ps1 in PowerShell instead.
+#   ./installV2.sh                          install to the default location
+#   ACT3_INSTALL_DIR=~/bin ./installV2.sh   install somewhere specific
+#   ACT3_SKIP_LOGIN=1 ./installV2.sh        install only; do not open a browser
+#   ACT3_SKIP_CLAUDE=1 ./installV2.sh       do not touch Claude Code config
+#
+# Windows: run installV2.ps1 in PowerShell instead.
 
 set -eu
 
 BINARY="act3-mcp"
+MODE="production"
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 die() {
     echo "error: $*" >&2
     exit 1
 }
+step() {
+    echo
+    echo "==> $*"
+}
 
 # ---- Which platform is this? ------------------------------------------------
-# uname's spelling is not the directory's spelling, so map explicitly rather than
-# guessing. An unrecognized machine gets a clear error, never a wrong binary.
-#
-# The Mac directories are named for the machine you own — Mac-Apple_Silicon and
-# Mac-Intel_CPU — not for the kernel (`darwin`) or a CPU vendor Apple has never
-# shipped (`amd64`). uname still answers in its own vocabulary, so this is where
-# the two are reconciled: one place, explicit, and wrong only loudly.
 os=$(uname -s)
 arch=$(uname -m)
 
@@ -36,7 +41,7 @@ case "$os" in
     Darwin) os="mac" ;;
     Linux)  os="linux"  ;;
     MINGW*|MSYS*|CYGWIN*)
-        die "this is Windows — run install.ps1 in PowerShell instead" ;;
+        die "this is Windows — run installV2.ps1 in PowerShell instead" ;;
     *)  die "unsupported operating system: $os (supported: macOS, Linux)" ;;
 esac
 
@@ -59,8 +64,6 @@ src="$repo_dir/bin/$platform/$BINARY"
        This clone looks incomplete. Try: git pull"
 
 # ---- Where should it go? ----------------------------------------------------
-# Prefer an explicit choice, then a system location if we can write to it
-# WITHOUT sudo, then a per-user fallback. Never silently escalate privileges.
 if [ -n "${ACT3_INSTALL_DIR:-}" ]; then
     dest_dir="$ACT3_INSTALL_DIR"
 elif [ -w /usr/local/bin ] 2>/dev/null; then
@@ -71,13 +74,12 @@ fi
 
 mkdir -p "$dest_dir" || die "cannot create $dest_dir"
 [ -w "$dest_dir" ] || die "cannot write to $dest_dir
-       Choose another: ACT3_INSTALL_DIR=\$HOME/bin ./install.sh"
+       Choose another: ACT3_INSTALL_DIR=\$HOME/bin ./installV2.sh"
 
 dest="$dest_dir/$BINARY"
 
 # ---- Install ----------------------------------------------------------------
-# Copy to a temp name in the same directory, then mv into place. A plain cp over
-# a running binary can fail with "Text file busy"; an atomic rename cannot.
+step "Installing $BINARY ($platform)"
 tmp="$dest.tmp.$$"
 trap 'rm -f "$tmp"' EXIT INT TERM
 cp "$src" "$tmp"
@@ -85,47 +87,80 @@ chmod 0755 "$tmp"
 mv -f "$tmp" "$dest"
 trap - EXIT INT TERM
 
-# ---- Prove it actually runs -------------------------------------------------
-# A copied file is not a working install: the binary could be the wrong arch or
-# blocked. Execute it once and fail loudly rather than declare false success.
 version=$("$dest" --version 2>/dev/null) || die "installed to $dest, but it will not run.
        This usually means the binary does not match your machine.
        Detected: $platform"
-
 echo "✓ installed $BINARY v$version -> $dest"
 
-# ---- Is it reachable? -------------------------------------------------------
+# Make the rest of this script (and the `claude mcp add` we register) work even
+# if dest_dir is not on PATH yet.
+path_note=""
 case ":${PATH}:" in
     *":$dest_dir:"*) ;;
     *)
-        echo
-        echo "NOTE: $dest_dir is not on your PATH, so typing '$BINARY' will not"
-        echo "      find it yet. Add this to your ~/.zshrc (or ~/.bashrc):"
-        echo
-        echo "        export PATH=\"$dest_dir:\$PATH\""
-        echo
-        echo "      Then open a new terminal."
+        PATH="$dest_dir:$PATH"; export PATH
+        path_note="$dest_dir is not on your PATH. Add this to ~/.zshrc (or ~/.bashrc), then open a new terminal:
+
+        export PATH=\"$dest_dir:\$PATH\""
         ;;
 esac
 
-cat <<EOF
+# ---- Already signed in? -----------------------------------------------------
+# `act3-mcp status` exits 0 when credentials exist and work, 1 otherwise. It
+# never prints the token. We only trigger a browser login when it says no.
+step "Checking ACT3 sign-in ($MODE)"
+if [ "${ACT3_SKIP_LOGIN:-}" = "1" ]; then
+    echo "skipped (ACT3_SKIP_LOGIN=1) — run '$BINARY login --mode $MODE' later."
+elif "$dest" status --mode "$MODE" >/dev/null 2>&1; then
+    account=$("$dest" status --mode "$MODE" 2>/dev/null | sed -n 's/^Auth:[[:space:]]*\([^ ]*\).*/\1/p')
+    echo "✓ already signed in${account:+ as $account} — no login needed."
+else
+    echo "Not signed in. Opening your browser to approve this computer…"
+    echo "(You must already be signed in to ACT3 in that browser.)"
+    echo
+    "$dest" login --mode "$MODE" || die "login did not complete.
+       Run it again any time:  $BINARY login --mode $MODE
+       No browser on this machine?  $BINARY login --mode $MODE --api-key"
+fi
 
-Next steps (production):
+# ---- Register with Claude Code ---------------------------------------------
+step "Connecting to Claude Code"
+if [ "${ACT3_SKIP_CLAUDE:-}" = "1" ]; then
+    echo "skipped (ACT3_SKIP_CLAUDE=1)."
+elif ! command -v claude >/dev/null 2>&1; then
+    echo "Claude Code CLI ('claude') not found — skipping. When you have it, run:"
+    echo "    claude mcp add act3 -s user -e ACT3_MODE=$MODE -- $dest serve"
+elif claude mcp get act3 >/dev/null 2>&1; then
+    echo "✓ 'act3' is already registered with Claude Code — leaving it as is."
+    echo "  (To re-register: claude mcp remove act3, then re-run this script.)"
+else
+    # -s user: register for the whole account, not just the directory this
+    # script happens to run from. Absolute path: works even when dest_dir is
+    # not on the PATH Claude Code launches servers with.
+    claude mcp add act3 -s user -e "ACT3_MODE=$MODE" -- "$dest" serve \
+        && echo "✓ registered 'act3' with Claude Code (all projects)" \
+        || echo "could not register with Claude Code — run by hand:
+    claude mcp add act3 -s user -e ACT3_MODE=$MODE -- $dest serve"
+fi
 
-  1. Sign in to ACT3 (opens your browser to approve this computer):
+# ---- Prove the whole chain works -------------------------------------------
+step "Final check"
+if [ "${ACT3_SKIP_LOGIN:-}" = "1" ]; then
+    echo "(skipped — not signed in yet)"
+else
+    "$dest" status --mode "$MODE" || die "status check failed — see the message above."
+fi
 
-       $BINARY login --mode production
+# ---- Wrap up ----------------------------------------------------------------
+echo
+if [ -n "$path_note" ]; then
+    echo "NOTE: $path_note"
+    echo
+fi
+cat <<MSG
+Done. In Claude Code, run /mcp to confirm 'act3' is connected, then ask for the
+filmmaking change you want.
 
-  2. Connect it to Claude Code:
-
-       claude mcp add act3 -s user -e ACT3_MODE=production -- $BINARY serve
-
-  3. Confirm it works:
-
-       $BINARY status --mode production
-
-  Tip: run 'export ACT3_MODE=production' once, then you can drop the flags above.
-       Omit the flag (or ACT3_MODE) to use the local dev backend instead.
-
-Then just ask Claude Code for the filmmaking change you want.
-EOF
+Tip: this build needs '--mode $MODE' (or ACT3_MODE=$MODE) for login/status.
+     Set it once:  echo 'export ACT3_MODE=$MODE' >> ~/.zshrc
+MSG
