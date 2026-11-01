@@ -173,8 +173,9 @@ All optional — defaults work for production.
 | `ACT3_API_KEY`    | —                           | API key override (skips stored creds; good for CI) |
 | `ACT3_CONFIG_DIR` | `~/.act3`                   | Where credentials are stored                |
 | `ACT3_LOG_LEVEL`  | `info`                      | `error` \| `warn` \| `info` \| `debug` (logs to stderr) |
+| `ACT3_SET_ID`     | —                           | The 4D set a request means when it names none: a set id (or a plain-ASCII set name). Sent with every call |
 
-Every variable except `ACT3_API_KEY` also has a flag form — `--mode`,
+Every variable except `ACT3_API_KEY` and `ACT3_SET_ID` also has a flag form — `--mode`,
 `--api-url`, `--app-url`, `--config-dir`, `--log-level` — given **after** the
 subcommand (`act3-mcp status --api-url …`). A flag beats the environment
 variable.
